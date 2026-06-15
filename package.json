@@ -4,7 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "e2e": "cucumber-js --config ./cucumber.cjs",
+    "e2e:setup": "tsx ./support/setup.ts",
+    "e2e": "pnpm e2e:setup && cucumber-js --config ./cucumber.cjs",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
@@ -12,6 +13,7 @@
     "@playwright/test": "^1.59.1",
     "dotenv": "^17.4.2",
     "ts-node": "^10.9.2",
+    "tsx": "^4.19.0",
     "typescript": "^5.5.0"
   }
 }
