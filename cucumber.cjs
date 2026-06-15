@@ -15,6 +15,5 @@ module.exports = {
       'features/car_owner_accept_offer.feature',
     ].map(resolve),
     format: ['summary'],
-    publishQuiet: true,
   },
 };
