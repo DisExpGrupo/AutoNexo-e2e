@@ -18,9 +18,11 @@ async function login(world: CustomWorld, email: string, password: string) {
 }
 
 Given('I am logged in as a car owner', async function (this: CustomWorld) {
-  await login(this, config.carOwnerEmail, config.carOwnerPassword);
+  const setup = this.requireSetup();
+  await login(this, setup.carOwner.email, setup.carOwner.password);
 });
 
 Given('I am logged in as a workshop owner', async function (this: CustomWorld) {
-  await login(this, config.workshopEmail, config.workshopPassword);
+  const setup = this.requireSetup();
+  await login(this, setup.workshop.managerEmail, setup.workshop.managerPassword);
 });

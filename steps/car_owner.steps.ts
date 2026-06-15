@@ -30,21 +30,25 @@ When('I register a new vehicle', async function (this: CustomWorld) {
   await expect(this.page.getByRole('heading', { name: 'Vehicle Registered' })).toBeVisible({ timeout: 10000 });
 });
 
-When('I create a service request with service {string} at {string}', async function (this: CustomWorld, serviceCode: string, coords: string) {
+When('I create a service request with service {string} at {string}', async function (this: CustomWorld, _serviceCode: string, _coords: string) {
   if (!this.page) throw new Error('Page not initialized');
-  const [lat, lng] = coords.split(',').map((value) => Number(value));
+  // Coordinates come from env (E2E_WORKSHOP_LATITUDE/LONGITUDE) so the
+  // setup script and the request always match. The feature-level args
+  // are kept for human-readable documentation.
+  const lat = config.workshopLatitude;
+  const lng = config.workshopLongitude;
 
   await this.page.goto(`${config.baseUrl}/service-requests/new`, { waitUntil: 'domcontentloaded' });
   await this.page.waitForSelector('#service-request-map');
   await this.page.locator('#vehicle').selectOption({ index: 1 });
-  
+
   // Click the visible label for the service (checkbox is visually hidden)
   // UI shows display names (e.g., "Cambio de pastillas de freno"), not codes
   const serviceLabel = this.page.locator('.service-checkbox-item').filter({ hasText: /freno|brake|pastilla/i }).first();
   await serviceLabel.waitFor({ state: 'visible', timeout: 5000 });
   await serviceLabel.scrollIntoViewIfNeeded();
   await serviceLabel.click();
-  
+
   await this.page.locator('#description').fill(requestDescription);
 
   await this.page.locator('#latitude').fill(String(lat));

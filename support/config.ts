@@ -14,15 +14,28 @@ function requireEnv(key: string): string {
   return value;
 }
 
+function optionalEnv(key: string): string | undefined {
+  return process.env[key];
+}
+
+function numberEnv(key: string, fallback: number): number {
+  const raw = process.env[key];
+  if (raw === undefined || raw === '') return fallback;
+  const n = Number(raw);
+  if (Number.isNaN(n)) throw new Error(`Invalid number for ${key}: ${raw}`);
+  return n;
+}
+
 export const config = {
   baseUrl: requireEnv('E2E_BASE_URL'),
   apiUrl: requireEnv('E2E_API_URL'),
-  carOwnerEmail: requireEnv('E2E_CAR_OWNER_EMAIL'),
-  carOwnerPassword: requireEnv('E2E_CAR_OWNER_PASSWORD'),
-  workshopEmail: requireEnv('E2E_WORKSHOP_EMAIL'),
-  workshopPassword: requireEnv('E2E_WORKSHOP_PASSWORD'),
+  workshopLatitude: numberEnv('E2E_WORKSHOP_LATITUDE', -12.108527),
+  workshopLongitude: numberEnv('E2E_WORKSHOP_LONGITUDE', -76.992718),
+  workshopCoords: function (): string {
+    return `${this.workshopLatitude}, ${this.workshopLongitude}`;
+  },
   headless: process.env.E2E_HEADLESS !== 'false',
   slowMo: process.env.E2E_SLOWMO ? Number(process.env.E2E_SLOWMO) : 0,
   recordVideo: process.env.E2E_VIDEO === 'true',
-  videoDir: process.env.E2E_VIDEO_DIR || path.resolve(__dirname, '../artifacts/videos'),
+  videoDir: optionalEnv('E2E_VIDEO_DIR') || path.resolve(__dirname, '../artifacts/videos'),
 };
