@@ -82,8 +82,12 @@ When('I view the latest pending request', async function (this: CustomWorld) {
 
 When('I accept the offer', async function (this: CustomWorld) {
   if (!this.page) throw new Error('Page not initialized');
-  // Wait for offers to load
-  await this.page.waitForSelector('.offer-card', { timeout: 10000 }).catch(() => {});
+  const hasCards = await this.page.waitForSelector('.offer-card', { timeout: 10000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!hasCards) {
+    throw new Error('No offer cards found on the request details page');
+  }
   const acceptBtn = this.page.getByRole('button', { name: /accept offer/i }).first();
   await acceptBtn.waitFor({ state: 'visible', timeout: 10000 });
   await acceptBtn.click();
