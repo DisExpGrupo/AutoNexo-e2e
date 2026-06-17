@@ -14,6 +14,11 @@ module.exports = {
       'features/workshop_send_offer.feature',
       'features/car_owner_accept_offer.feature',
     ].map(resolve),
-    format: ['summary'],
+    format: [
+      'pretty',
+      'summary',
+      'html:artifacts/cucumber-report.html',
+      'json:artifacts/cucumber-report.json',
+    ],
   },
 };
