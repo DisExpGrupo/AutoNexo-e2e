@@ -163,25 +163,25 @@ export class ApiClient {
   }
 
   signup(req: SignUpRequest) {
-    return this.request<SignUpResponse>('POST', '/api/v1/users/signup', req);
+    return this.request<SignUpResponse>('POST', '/v1/users/signup', req);
   }
 
   signin(req: SignInRequest) {
-    return this.request<SignInResponse>('POST', '/api/v1/users/signin', req);
+    return this.request<SignInResponse>('POST', '/v1/users/signin', req);
   }
 
   createWorkshop(req: CreateWorkshopRequest, token: string) {
-    return this.request<WorkshopResource>('POST', '/api/v1/workshops', req, token);
+    return this.request<WorkshopResource>('POST', '/v1/workshops', req, token);
   }
 
   addLocation(req: AddLocationRequest, token: string) {
-    return this.request<LocationResource>('POST', '/api/v1/workshops/locations', req, token);
+    return this.request<LocationResource>('POST', '/v1/workshops/locations', req, token);
   }
 
   addServiceTemplate(req: AddServiceTemplateRequest, token: string) {
     return this.request<ServiceTemplateResource>(
       'POST',
-      '/api/v1/workshops/service-templates',
+      '/v1/workshops/service-templates',
       req,
       token,
     );
@@ -190,7 +190,7 @@ export class ApiClient {
   getWorkshopServices(workshopId: number) {
     return this.request<ServiceTemplateResource[]>(
       'GET',
-      `/api/v1/workshops/${workshopId}/services`,
+      `/v1/workshops/${workshopId}/services`,
     );
   }
 }
