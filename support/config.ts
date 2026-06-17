@@ -38,4 +38,5 @@ export const config = {
   slowMo: process.env.E2E_SLOWMO ? Number(process.env.E2E_SLOWMO) : 0,
   recordVideo: process.env.E2E_VIDEO === 'true',
   videoDir: optionalEnv('E2E_VIDEO_DIR') || path.resolve(__dirname, '../artifacts/videos'),
+  debug: process.env.E2E_DEBUG === 'true',
 };

@@ -1,12 +1,15 @@
-import { Before, After, setDefaultTimeout } from '@cucumber/cucumber';
+import { After, Before, setDefaultTimeout } from '@cucumber/cucumber';
 import type { CustomWorld } from './world';
+import { config } from './config.ts';
 
 setDefaultTimeout(60 * 1000);
+
+const debug = config.debug;
 
 Before(async function (this: CustomWorld) {
   await this.init();
 
-  if (this.page) {
+  if (this.page && debug) {
     this.page.on('response', (resp) => {
       if (resp.status() >= 400) {
         const url = resp.url();
@@ -24,10 +27,10 @@ Before(async function (this: CustomWorld) {
   }
 });
 
-After(async function (this: CustomWorld) {
-  if (this.page) {
+After(async function (this: CustomWorld, scenario) {
+  if (this.page && (scenario.result?.status === 'FAILED' || debug)) {
     try {
-      const path = `artifacts/screenshot-scenario-${Date.now()}.png`;
+      const path = `artifacts/screenshot-${scenario.pickle.name.replace(/\s+/g, '-')}-${Date.now()}.png`;
       await this.page.screenshot({ path });
       console.log(`[e2e:debug] Screenshot saved: ${path}`);
     } catch {
