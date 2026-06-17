@@ -1,7 +1,122 @@
 import { Then, When } from '@cucumber/cucumber';
 import { expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import type { CustomWorld } from '../support/world';
 import { config } from '../support/config.ts';
+
+type OfferFormRef = {
+  proposedPriceAmount: number | null;
+  proposedDate: Date | null;
+};
+
+async function readOfferForm(page: Page): Promise<OfferFormRef | null> {
+  return page.evaluate(() => {
+    const app = document.querySelector('#app') as any;
+    if (!app?.__vue_app__) return null;
+    const form = (function find(inst: any): any {
+      if (inst?.setupState?.offerForm) return inst.setupState;
+      const sub = inst?.subTree;
+      if (!sub) return null;
+      const kids = Array.isArray(sub.children)
+        ? sub.children
+        : sub.component
+          ? [sub]
+          : [];
+      for (const c of kids) {
+        if (c?.component) {
+          const r = find(c.component);
+          if (r) return r;
+        }
+        if (Array.isArray(c?.children)) {
+          for (const gc of c.children) {
+            if (gc?.component) {
+              const r = find(gc.component);
+              if (r) return r;
+            }
+          }
+        }
+      }
+      return null;
+    })(app.__vue_app__._instance);
+    if (!form) return null;
+    return {
+      proposedPriceAmount: form.proposedPriceAmount,
+      proposedDate: form.proposedDate,
+    };
+  });
+}
+
+async function setOfferFormValues(
+  page: Page,
+  values: { price: number; dateISO: string },
+): Promise<void> {
+  await page.evaluate(({ price, dateISO }) => {
+    const app = document.querySelector('#app') as any;
+    if (!app?.__vue_app__) return;
+
+    function find(inst: any): any {
+      if (inst?.setupState?.offerForm) return inst.setupState;
+      const sub = inst?.subTree;
+      if (!sub) return null;
+      const kids = Array.isArray(sub.children)
+        ? sub.children
+        : sub.component
+          ? [sub]
+          : [];
+      for (const c of kids) {
+        if (c?.component) {
+          const r = find(c.component);
+          if (r) return r;
+        }
+        if (Array.isArray(c?.children)) {
+          for (const gc of c.children) {
+            if (gc?.component) {
+              const r = find(gc.component);
+              if (r) return r;
+            }
+          }
+        }
+      }
+      return null;
+    }
+
+    const form = find(app.__vue_app__._instance);
+    if (!form) return;
+    if (!form.proposedPriceAmount) form.proposedPriceAmount = price;
+    if (!form.proposedDate) form.proposedDate = new Date(dateISO);
+  }, values);
+}
+
+function formatFutureDate(daysAhead: number): string {
+  const target = new Date();
+  target.setDate(target.getDate() + daysAhead);
+  return `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, '0')}-${String(target.getDate()).padStart(2, '0')}`;
+}
+
+async function ensureOfferFormCommitted(
+  page: Page,
+  expected: { price: number; dateISO: string },
+): Promise<void> {
+  const form = await readOfferForm(page);
+  const priceOk = form?.proposedPriceAmount === expected.price;
+  const dateOk = form?.proposedDate instanceof Date && form.proposedDate > new Date();
+  if (!priceOk || !dateOk) {
+    await setOfferFormValues(page, expected);
+    // Wait for Vue's reactivity to flush
+    await page.waitForFunction(
+      () => {
+        const app = document.querySelector('#app') as any;
+        if (!app?.__vue_app__) return false;
+        // Re-check via the dialog's input values which are the source of truth
+        const priceInput = document.querySelector('#offer-price input') as HTMLInputElement | null;
+        const dateInput = document.querySelector('#offer-date input') as HTMLInputElement | null;
+        return !!(priceInput?.value && dateInput?.value);
+      },
+      undefined,
+      { timeout: 2000 },
+    ).catch(() => {});
+  }
+}
 
 When('I open "Requests" and view nearby opportunities', async function (this: CustomWorld) {
   if (!this.page) throw new Error('Page not initialized');
@@ -43,17 +158,19 @@ When('I send an offer for the latest request', async function (this: CustomWorld
   await requestCard.scrollIntoViewIfNeeded();
   await requestCard.getByRole('button', { name: /send offer/i }).click();
 
-  const target = new Date();
-  target.setDate(target.getDate() + 30);
-  const futureDate = `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, '0')}-${String(target.getDate()).padStart(2, '0')}`;
+  const futureDate = formatFutureDate(30);
+  const offerPrice = 180;
 
+  // Fill price via PrimeVue InputNumber (use selectText + type + Tab to commit v-model)
   const priceInput = this.page.locator('#offer-price input');
   await priceInput.click();
   await priceInput.press('Control+a');
   await priceInput.press('Delete');
-  await priceInput.pressSequentially('180', { delay: 50 });
+  await priceInput.pressSequentially(String(offerPrice), { delay: 50 });
   await priceInput.press('Tab');
 
+  // Fill date via PrimeVue Calendar widget (programmatic fill of the text input
+  // does not commit the v-model reliably)
   const dateInput = this.page.locator('#offer-date input');
   await dateInput.click();
   await this.page.locator('.p-datepicker-panel').waitFor({ state: 'visible', timeout: 5000 });
@@ -71,129 +188,14 @@ When('I send an offer for the latest request', async function (this: CustomWorld
     .filter({ hasText: new RegExp(`^${day}$`) })
     .first()
     .click();
+  // Re-focus price to ensure date input blur fires its v-model commit
   await priceInput.click();
-  await this.page.waitForTimeout(300);
 
-  // PrimeVue InputNumber/Calendar v-model does not always commit from
-  // Playwright keyboard events. Verify the values took hold; if not,
-  // set them directly via Vue's internal component state.
-  const valuesOk = await this.page.evaluate(() => {
-    try {
-      const app = document.querySelector('#app');
-      if (!app || !(app as any).__vue_app__) return false;
-      const vueApp = (app as any).__vue_app__;
+  // Vue's InputNumber/Calendar v-model does not always commit from
+  // Playwright keyboard events. If values are missing, set them directly
+  // via the component's reactive state.
+  await ensureOfferFormCommitted(this.page!, { price: offerPrice, dateISO: futureDate });
 
-      function findOfferForm(inst: any): any {
-        if (inst?.setupState?.offerForm) return inst.setupState.offerForm;
-        const sub = inst?.subTree;
-        if (!sub) return null;
-        const kids = Array.isArray(sub.children) ? sub.children : sub.component ? [sub] : [];
-        for (const c of kids) {
-          if (c?.component) {
-            const r = findOfferForm(c.component);
-            if (r) return r;
-          }
-          if (Array.isArray(c?.children)) {
-            for (const gc of c.children) {
-              if (gc?.component) {
-                const r = findOfferForm(gc.component);
-                if (r) return r;
-              }
-            }
-          }
-        }
-        return null;
-      }
-
-      const form = findOfferForm(vueApp._instance);
-      if (!form) return false;
-      return { price: form.proposedPriceAmount, date: form.proposedDate };
-    } catch {
-      return false;
-    }
-  });
-
-  if (valuesOk === false || valuesOk === undefined || valuesOk === null) {
-    // Fallback: retry filling with evaluate-based value assignment
-    await this.page.evaluate((args) => {
-      const app = document.querySelector('#app') as any;
-      if (!app?.__vue_app__) return;
-      const vueApp = app.__vue_app__;
-
-      function findOfferForm(inst: any): any {
-        if (inst?.setupState?.offerForm) return inst.setupState.offerForm;
-        const sub = inst?.subTree;
-        if (!sub) return null;
-        const kids = Array.isArray(sub.children) ? sub.children : sub.component ? [sub] : [];
-        for (const c of kids) {
-          if (c?.component) {
-            const r = findOfferForm(c.component);
-            if (r) return r;
-          }
-          if (Array.isArray(c?.children)) {
-            for (const gc of c.children) {
-              if (gc?.component) {
-                const r = findOfferForm(gc.component);
-                if (r) return r;
-              }
-            }
-          }
-        }
-        return null;
-      }
-
-      const form = findOfferForm(vueApp._instance);
-      if (form) {
-        form.proposedPriceAmount = args.price;
-        form.proposedDate = new Date(args.dateISO);
-      }
-    }, { price: 180, dateISO: futureDate });
-    await this.page.waitForTimeout(200);
-  } else if (
-    typeof valuesOk === 'object' &&
-    (valuesOk.price === 0 || valuesOk.price === null || valuesOk.date === null)
-  ) {
-    await this.page.evaluate((args) => {
-      const app = document.querySelector('#app') as any;
-      if (!app?.__vue_app__) return;
-      const vueApp = app.__vue_app__;
-
-      function findOfferForm(inst: any): any {
-        if (inst?.setupState?.offerForm) return inst.setupState.offerForm;
-        const sub = inst?.subTree;
-        if (!sub) return null;
-        const kids = Array.isArray(sub.children) ? sub.children : sub.component ? [sub] : [];
-        for (const c of kids) {
-          if (c?.component) {
-            const r = findOfferForm(c.component);
-            if (r) return r;
-          }
-          if (Array.isArray(c?.children)) {
-            for (const gc of c.children) {
-              if (gc?.component) {
-                const r = findOfferForm(gc.component);
-                if (r) return r;
-              }
-            }
-          }
-        }
-        return null;
-      }
-
-      const form = findOfferForm(vueApp._instance);
-      if (form) {
-        if (form.proposedPriceAmount <= 0 || form.proposedPriceAmount === null) {
-          form.proposedPriceAmount = args.price;
-        }
-        if (form.proposedDate === null || form.proposedDate === undefined) {
-          form.proposedDate = new Date(args.dateISO);
-        }
-      }
-    }, { price: 180, dateISO: futureDate });
-    await this.page.waitForTimeout(200);
-  }
-
-  // Wait for the dialog to become visible before clicking Send Offer
   const dialog = this.page.getByRole('dialog', { name: 'Send Offer' });
   await dialog.waitFor({ state: 'visible', timeout: 5000 });
 
@@ -201,12 +203,11 @@ When('I send an offer for the latest request', async function (this: CustomWorld
   await expect(sendButton).toBeEnabled({ timeout: 5000 });
   await sendButton.click();
 
-  // Wait for the offer creation API call
-  const offerResp = await this.page.waitForResponse(
+  const offerResp = await this.page!.waitForResponse(
     (resp) => resp.url().includes('/offers') && resp.request().method() === 'POST',
     { timeout: 15000 },
   ).catch(async () => {
-    const toastText = await this.page.locator('.p-toast-message-text').first().textContent().catch(() => 'unknown');
+    const toastText = await this.page!.locator('.p-toast-message-text').first().textContent().catch(() => 'unknown');
     throw new Error(`Offer creation request never completed. Toast message: ${toastText}`);
   });
 
@@ -219,13 +220,11 @@ When('I send an offer for the latest request', async function (this: CustomWorld
 Then('I see the offer in "My Active Services"', async function (this: CustomWorld) {
   if (!this.page) throw new Error('Page not initialized');
   await this.page.keyboard.press('Escape');
-  await this.page.waitForTimeout(200);
 
   const activeTab = this.page.locator('.tab-btn', { hasText: 'My Active Services' });
   await activeTab.waitFor({ state: 'visible', timeout: 5000 });
   await activeTab.click();
 
-  // Wait for the active-services API response
   await this.page.waitForResponse(
     (resp) => resp.url().includes('/offers/workshop') || resp.url().includes('/my-workshop/offers'),
     { timeout: 10000 },
