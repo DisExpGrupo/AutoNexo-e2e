@@ -30,11 +30,10 @@ When('I register a new vehicle', async function (this: CustomWorld) {
   await expect(this.page.getByRole('heading', { name: 'Vehicle Registered' })).toBeVisible({ timeout: 10000 });
 });
 
-When('I create a service request with service {string} at {string}', async function (this: CustomWorld, _serviceCode: string, _coords: string) {
+When('I create a service request with service {string} at the workshop coordinates', async function (this: CustomWorld, _serviceCode: string) {
   if (!this.page) throw new Error('Page not initialized');
   // Coordinates come from env (E2E_WORKSHOP_LATITUDE/LONGITUDE) so the
-  // setup script and the request always match. The feature-level args
-  // are kept for human-readable documentation.
+  // setup script and the request always match.
   const lat = config.workshopLatitude;
   const lng = config.workshopLongitude;
 
