@@ -33,8 +33,9 @@ There is **no `lint` or `test` script**. Don't invent one; run `typecheck` only.
 3. Write the result to `.e2e-setup.json` (gitignored).
 
 The script exits non-zero on any failure; the error includes the failing API
-`status` + body. **No backend cleanup runs** — each setup leaves 2 users, 1
-workshop, 1 location, 1 service template in the DB. Don't run e2e against prod.
+`status` + body. **No cleanup runs** — each setup leaves 2 users, 1
+workshop, 1 location, 1 service template in the DB (with unique emails so
+collisions are avoided). Don't run e2e against prod.
 
 ## Environment
 Copy `.env.e2e.example` to `.env.e2e` (gitignored). Keys:
