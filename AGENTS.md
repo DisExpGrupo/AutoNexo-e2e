@@ -79,8 +79,17 @@ break the `lastRequestDescription` lookup.
 - `support/setup.ts` + `support/setup-state.ts` — provisioning script and
   state I/O.
 - `support/db-cleanup.ts` — before-suite TRUNCATE utility. Dynamically queries
-  `information_schema.tables` and truncates all application tables (excluding
-  `flyway_schema_history`). Uses `mysql2/promise`.
+  `information_schema.tables` and truncates all transactional tables, excluding
+  reference/seed tables (`vehicle_brands`, `vehicle_models`, `roles`) and
+  `flyway_schema_history`. Uses `mysql2/promise`.
+
+## CI Pipeline
+The unified GitHub Actions workflow lives in the **backend repository**
+(`AutoNexo-Backend/.github/workflows/ci.yml`). It checks out the frontend and
+E2E repos as siblings, spins up an ephemeral API + MySQL stack via
+`docker-compose.ci.yml`, runs backend tests, frontend tests, and then E2E tests.
+Before each E2E run, `truncateAllTables()` guarantees a fresh transactional DB
+slate while preserving reference seed data.
 
 ## Debugging
 Set in `.env.e2e`: `E2E_HEADLESS=false`, `E2E_SLOWMO=150`, `E2E_VIDEO=true`.
