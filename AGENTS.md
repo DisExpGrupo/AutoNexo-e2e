@@ -33,14 +33,17 @@ There is **no `lint` or `test` script**. Don't invent one; run `typecheck` only.
 3. Write the result to `.e2e-setup.json` (gitignored).
 
 The script exits non-zero on any failure; the error includes the failing API
-`status` + body. **No cleanup runs** — each setup leaves 2 users, 1
-workshop, 1 location, 1 service template in the DB (with unique emails so
-collisions are avoided). Don't run e2e against prod.
+`status` + body. Before provisioning, `setup.ts` calls `truncateAllTables()`
+from `support/db-cleanup.ts` to guarantee a **fresh DB slate for every E2E run**.
+This is a before-suite cleanup (not per-scenario) because scenarios are chained
+and depend on shared state. Don't run e2e against prod.
 
 ## Environment
 Copy `.env.e2e.example` to `.env.e2e` (gitignored). Keys:
 `E2E_BASE_URL`, `E2E_API_URL`, `E2E_HEADLESS`, `E2E_SLOWMO`, `E2E_VIDEO`,
-`E2E_VIDEO_DIR`, plus `E2E_WORKSHOP_LATITUDE` / `E2E_WORKSHOP_LONGITUDE`.
+`E2E_VIDEO_DIR`, `E2E_WORKSHOP_LATITUDE` / `E2E_WORKSHOP_LONGITUDE`, plus
+`E2E_DB_HOST`, `E2E_DB_PORT`, `E2E_DB_NAME`, `E2E_DB_USER`, `E2E_DB_PASSWORD`
+for the before-suite DB cleanup hook.
 
 **`E2E_WORKSHOP_LATITUDE` / `E2E_WORKSHOP_LONGITUDE` are the single source of
 truth** — the setup script registers the workshop at these coords, and the
@@ -75,6 +78,9 @@ break the `lastRequestDescription` lookup.
 - `support/api-client.ts` — typed fetch wrapper, defines `ApiError`.
 - `support/setup.ts` + `support/setup-state.ts` — provisioning script and
   state I/O.
+- `support/db-cleanup.ts` — before-suite TRUNCATE utility. Dynamically queries
+  `information_schema.tables` and truncates all application tables (excluding
+  `flyway_schema_history`). Uses `mysql2/promise`.
 
 ## Debugging
 Set in `.env.e2e`: `E2E_HEADLESS=false`, `E2E_SLOWMO=150`, `E2E_VIDEO=true`.

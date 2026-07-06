@@ -39,4 +39,10 @@ export const config = {
   recordVideo: process.env.E2E_VIDEO === 'true',
   videoDir: optionalEnv('E2E_VIDEO_DIR') || path.resolve(__dirname, '../artifacts/videos'),
   debug: process.env.E2E_DEBUG === 'true',
+  // DB connection for before-suite cleanup
+  dbHost: process.env.E2E_DB_HOST || '127.0.0.1',
+  dbPort: numberEnv('E2E_DB_PORT', 3306),
+  dbName: process.env.E2E_DB_NAME || 'autonexo-database',
+  dbUser: process.env.E2E_DB_USER || 'root',
+  dbPassword: process.env.E2E_DB_PASSWORD || 'Admin-123',
 };

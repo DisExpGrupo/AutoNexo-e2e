@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ApiClient, ApiError } from './api-client.ts';
 import { writeSetupState, type SetupState } from './setup-state.ts';
+import { truncateAllTables } from './db-cleanup.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -32,6 +33,10 @@ function logStep(msg: string): void {
 }
 
 async function main(): Promise<void> {
+  // Before-suite DB cleanup: guarantees a fresh slate for every E2E run.
+  // Do NOT call per-scenario; scenarios are chained and share state.
+  await truncateAllTables();
+
   const runId = randomSuffix();
   const carOwnerEmail = `e2e-carowner-${runId}@test.com`;
   const workshopEmail = `e2e-workshop-${runId}@test.com`;
